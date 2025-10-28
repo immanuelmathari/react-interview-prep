@@ -1,0 +1,919 @@
+Qn) If you'd like to use an existing component as a black box for composing another component's functionality, which technique is the most likely solution to the problem?
+a) lifting state to the parent
+b) inheritance
+c) using a higher-order component
+d) using a portal
+e) using context
+
+my-answer C
+
+- A Higher-Order Component (HOC) is a function that takes a component and returns a new component.
+- Its used when you want to reuse component logic without modifying the component itself, treating it as a black box. 
+- This allows composition of behaviour around existing components
+
+ToDo
+- create a higher order component and use it
+
+function withLogger(WrappedComponent) {
+  return function EnhancedComponent(props) {
+    console.log("Props received:", props);
+    return <WrappedComponent {...props} />;
+  };
+}
+
+const User = (props) => <div>Hello {props.name}</div>;
+const UserWithLogger = withLogger(User);
+
+- Here, User is the black box, and withLogger adds extra functionality without touching User.
+
+
+
+ToDo
+10 Common React Interview Questions
+What are React Hooks?
+Explain useState, useEffect, and why Hooks were introduced.
+What’s the difference between a controlled and uncontrolled component?
+Explain the Virtual DOM and how React uses it to optimize rendering.
+What is the purpose of useMemo and useCallback?
+What is reconciliation in React?
+How does React’s Context API differ from Redux?
+What’s the difference between React.memo and useMemo?
+Explain the difference between props and state.
+How would you handle side effects in React components?
+What is lazy loading and how do you implement it in React?
+
+
+Qn) In the below code, how many times will the Child component render? Enter the number of times as an integer in the answer field
+const Child = () => <div>I'm the child...</div>
+
+const Parent = () => {
+    const [status, setStatus] = useState("clean");
+
+    const load = async () => {
+        const response = await new Promise(resolve => 
+            setTimeout(resolve, 1000, {data: "dirty})
+        );
+        setStatus(response.data);
+    };
+    
+    useEffect(() => {
+        load();
+    }, []);
+
+    return (
+        <div>
+            <div>{status}</div>
+            <Child />
+        </div>
+    );
+};
+
+ReactDOM.render(<Parent />, document.body);
+
+my-answer 1
+correct-answer 2
+
+explanation
+- number one note that the first render happens before the useEffect runs.
+- the component Parent renders for the first time and status is clean initially. the useEffect runs after the first render
+clean
+I'm the child...
+- in useEffect, load is called. init, we simulate an async API call
+- after one second, the promise resolves with { data: "dirty" }
+- then the useEffect is updated
+- when setStatus dirty runs, react detects the state change and re-renders Parent component with the new state
+dirty
+I'm the child...
+Concept being tested:
+React re-renders children when their parent re-renders, unless they are memoized.
+- child being a function component is not memoized. 
+- everytime parent re-renders, react also calls Child() again
+- if we wrapped child like this, it would only render once, since its props never change
+const Child = React.memo(() => <div>I'm the child...</div>);
+1. Render phase (synchronous) - react calls your component function. 
+2. Commit phase - DOM update. - the UI
+3. Effect phase (asynchronous) - useEffect
+4. State Update - rerender
+
+
+Qn) In the following component, which line of code needs to change in order to ensure that the component is rendered twice? Enter the line number only in the answer field
+1const Example = () => {
+2    const [words, setWords] = useState([]);
+3
+4    const loadWords = async () => {
+5        const response = await new Promise(resolve => 
+6            setTimeout(resolve, 2000, {data: [
+7                "apples", "bananas", "cherries"
+8            ]})
+9        );
+10        setWords(response.data);
+11    );
+12
+13    useEffect(() => {
+14        loadWords();
+15    }, [words]);
+16
+17    return (
+18        <>
+19            {words.length
+20                ? <ul>
+21                    {words.map((e,i) => 
+22                        <li key={i + e}>{e}</li>
+23                    )}
+24                    </ul>
+25                : <Spinner />
+26            }
+27        </>
+28    );
+29};
+
+my-answer 15
+
+explanation
+- initial render words = []
+- react calls useEffect (since it always runs after the first render)
+- it calls loadWords
+- inside loadWords(), after 2 seconds, setWords(response.data) updates the state
+- any state update triggers a re-render
+- react sees words changed from [] to ["apples","bananas","cherries"]
+- because words changed, the effect runs again after the re-render
+- which calls loadWords() again which sets words again creating an infinite loop
+Change line 15 to:
+}, []);  // runs only once on mount
+
+
+Qn) 
+What's wrong with the following code snippet? Select all that apply
+const Example = () => {
+    const [words, setWords] = useState([]);
+
+.    useEffect(() => 
+        fetch("https://www.example.com/endpoint")
+        .then(response => setWords(response.data))
+        .catch(err => console.error(err))
+.    , []);
+
+.    const handleClick = e => {
+        fetch("https://www.example.com/endpoint")
+            .catch(err => console.error(err))
+.        ;
+    };
+
+    return (
+        <>
+            {words.length
+                ? <ul>
+                    {words.map((e,i) => 
+                        <>
+                            <li key={i + e}>{e}</li>
+                            <button onClick={handleClick}>Click here</button>
+                        </>
+                    )}
+                </ul>
+            : <p> Loading... </p>
+        }
+        </>
+    );
+};
+
+
+answer and explanation
+- missing .json() parsing on fetch()
+fetch("https://www.example.com/endpoint")
+        .then(response => setWords(response.data))
+ - fetch() returns a response object not the JSON data directly
+ - because it doesnt have a response.data property
+ - we need to call response.json() first
+correct code
+fetch("https://www.example.com/endpoint")
+  .then(res => res.json())
+  .then(data => setWords(data))
+  .catch(err => console.error(err));
+- improper arrow function syntax in useEffect
+ - you use parenthesis () instead of curly braces {} for the arrow function body
+ - this means the function returns the results of fetch() (a promise) not undefined
+ - react doesn't expect effects to return Promises. it expects nothing or a cleanedup function
+useEffect(() => {
+  fetch("https://www.example.com/endpoint")
+    .then(res => res.json())
+    .then(data => setWords(data))
+    .catch(err => console.error(err));
+}, []);
+ - invaid element structure inside map() function
+ - you cant put multiple elements inside a fragmant without a key when mapping
+ - react will warn: each child in a list should have a unique key prop
+ - the key must be on the topmost element returned from .map()
+{words.map((e, i) => (
+  <React.Fragment key={i + e}>
+    <li>{e}</li>
+    <button onClick={handleClick}>Click here</button>
+  </React.Fragment>
+))}
+ - Button placement is illogial
+ - move the button outside of the map
+<ul>
+  {words.map((e,i) => <li key={i + e}>{e}</li>)}
+</ul>
+<button onClick={handleClick}>Click here</button>
+
+Qn) Error boundaries are components which are used to catch errors thrown only by their immediate children components
+a) true 
+f) false
+
+my-answer true
+
+explanation
+- error boundaries in react are special components that catch JavaScript errors in their child component tree during:
+ - rendering
+ - lifecycle methods
+ - constructors of their children
+- they cannot chatch errors inside themselves only in their immediate and deeper child components
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    state getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, info) {
+        console.error("Error caught by boundary:", error);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return <h2>Something went wrong. </h2>;
+        }
+        return this.props.children;
+    }
+}
+usage
+<ErrorBoundary>
+    <BuggyComponent />
+</ErrorBoundary>
+
+Limitations — Error Boundaries do not catch:
+- Errors in event handlers
+- Asynchronous code (e.g. setTimeout, fetch)
+- Server-side rendering
+- Errors inside the Error Boundary itself
+<button onClick={() => { throw new Error("Oops"); }}>
+  Click me
+</button>
+This error won’t be caught by an error boundary — you’d need a regular try...catch around the event handler.
+
+Qn) Which of the following errors will NOT be caught by an error boundary
+(select all that apply)
+a) Errors thrown inside event handlers
+b) Errors during server-side rendering
+c) Errors inside asynchronous code like setTimeout
+d) Errors thrown by a child component's render method
+
+my-answer a,b,c
+
+explanation
+- Error boundaries can only catch errors in 
+ - Their child components' render phase (during render-time)
+ - Lifecycle methods
+ - Constructors
+
+Qn) Which lifecycle method(s) can you use to handle errors in a class-based error boundary?
+a) componentDidCatch
+b) getDerivedStateFromError
+c) Both a and b
+d) componentDidUpdate
+
+my-answer i dont really know and i dont want to guess
+correct-answer c
+
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError(error) {
+        // update state so fallback UI renders
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, info) {
+        // log the error or report it
+        console.log("Caught by Error Boundary:", error, info);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return <h2>Something went wrong. </h2>
+        }
+        return this.props.children;
+    }
+}
+- getDerivedStateFromError(error) - Updates the state before rendering the fallback UI
+- componentDidCatch(error, info) - Logs the error or performs side effects (send to logging services)
+ 
+Qn) You have the following code:
+<ErrorBoundary>
+    <ComponentA />
+    <ComponentB />
+</ErrorBoundary>
+If ComponentA throws an error during render, what happens?
+a) The whole page crashes
+b) Only ComponentA is replaced by the fallback UI
+c) Both ComponentA and ComponentB are replaced by the fallback UI
+d) Nothing - ErrorBoundary doesn't catch it
+
+my-answer again im sorry i dont really know. please teach me
+correct-answer C
+
+explanation
+- when any child component throws an error, the entire subtree inside the errorBoundary fails. 
+- React stops rendering all siblings (ComponentB in this case)
+- The errorBoundary replaces everything inside it with its fallback UI
+
+Qn) You're using function components. Can you create an error boundary using only hooks (no classes)?
+a) Yes, using useEffect
+b) Yes, using useErrorBoundary build into React
+c) No, React only supports class-based error boundaries
+d) Yes, with useErrorBoundary from a third-party library like react-error-boundary
+
+my-answer im sorry i again dont know
+correct-answer D
+
+explanation
+- React itself as of now (18,19) does not have built-in hooks for error boundaries
+- Error boundaries must be class components, because React's error-handling mechanism is based on lifecycle methods (componentDidCatch)
+- However, libraries like react-error-boundary offer a useErrorBoundary() hook and a <ErrorBoundary> wrapper for function components.
+import { ErrorBoundary, useErrorBoundary } from "react-error-boundary";
+
+function MyComponent() {
+    const { showBoundary } = useErrorBoundary();
+
+    return <button onClick={() => showBoundary(new Error("Oops!"))}>Trigger</button>;
+
+so,
+useEffect cant catch render errors
+there's no build in useErrorBoundary
+Not possible natively in React (only with classes)
+its possible via a third party hook
+
+- Lifecycle methods are special methods in React class components that let you run code at specific points in a component's life cycle from mounting, updating, to unmounting
+- the three phases of a class component
+Phase - Purpose - Example methods
+a) Mounting (birth) - when component is first added to the DOM - constructor() -> componentDidMount()
+b) Updating (growth) - when props or state change - shouldComponentUpdate(), componentDidUpdate()
+c) Unmounting (death) - When component is removed from DOM - componentWillUnmount()
+d) Error Handling - when a descendant throws and error - static getDerivedStateFromError(), componentDidCatch()
+
+class Example extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { count: 0 };
+        console.log('Constructor');
+    }
+    componentDidMount() {
+        console.log('Mounted');
+    }
+    componentDidUpdate() {
+        console.log('Updated');
+    }
+    componentWillUnmount() {
+        console.log('Unmounted');
+    }
+
+    static getDerivedStateFromError(error) {
+        console.log('Error caught (state update)');
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, info) {
+        console.log('Error caught (side effect or log)');
+    }
+
+    render() {
+        console.log('Render');
+        return <button onClick={() => this.setState({ count: this.state.count + 1 })}>Click</button>;
+    }
+}
+
+code
+
+class ErrorBoundary extends React.Component {
+    state = { hasError: false };
+
+    static getDerivedStateFromError(error) {
+        return { hasError: true };
+    }
+
+    componentDidCatch(error, info) {
+        console.error("Error caught:", error);
+    }
+
+    render() {
+        if (this.state.hasError) return <h2>Something went wrong</h2>;
+        return this.props.children;
+    }
+}
+
+in functional components
+- hooks like useEffect cannot catch render errors.
+- they can only catch errors inside the event callback eg try/catch inside useEffect - not the render tree
+- React does not provide a built-in useErrorBoundary() hook
+- however, third-party libraries like react-error-boundary lets you use error boundaries with function components
+
+code
+import { ErrorBoundary } from "react-error-boundary";
+
+function Fallback({ error }) {
+    return <p> Oops: {error.message}</p>;
+}
+
+function Problematic() {
+    throw new Error("Crashed!");
+}
+
+export default function App() {
+    return (
+        <ErrorBoundary FallbackComponent={Fallback}>
+            <Problematic />
+        </ErrorBoundary>
+    );
+}
+
+
+| Feature         | Class Components          | Function Components           
+
+| **Syntax**      | ES6 class                 | Plain JS function             
+| **State**       | `this.state`, `this.setState()`  | `useState()`                  
+| **Lifecycle methods**  | Explicit methods (`componentDidMount`, etc.) | Hooks (`useEffect`)
+| **Refs**      | `React.createRef()`         | `useRef()`                    
+| **Context**   | `contextType`               | `useContext()`                
+| **Error Boundaries**  | ✅ Supported (via lifecycle methods) | ❌ Not built-in (need library) |
+| **Performance**    | Slightly heavier      | Generally lighter           
+| **Recommended by React team** | Legacy      | ✅ Modern standard        
+
+
+Qn)
+Choose the components type(s) that best describes this code.
+cost FilePicker = () => {
+    const fileInput = React.createRef();
+
+    const handleSubmit = evt => {
+        evt.preventDefault();
+        console.log(fileInput.current.files[0].name);
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <label>
+                Upload file: 
+                <input type="file" ref={fileInput} />
+            </label>
+            <button type="submit">Submit</button>
+        </form>
+    );
+};
+a) controlled component
+b) uncontrolled component
+c) higer-order component
+d) pure component
+e) functional component
+f) class component
+g) suspense component
+
+my-answer e,d
+
+correct-answer e,b
+
+explanation
+- a controlled component is one where the input value is controlled by React State like value={stateVar} and onChange={setState}
+- here the <input type="file" /> does not use useState or onChange
+- instead, it uses a ref (fileInput.current.files) to directly access the DOM value.
+- an uncontrolled component is one where the DOM (Document Object Model) manages its own internal state.
+- the reason why its not a pure component, a pureComponent is a class-based optimization that does shallow comparison of props/state.
+- Function components dont become pure unless wrapped in React.memo()
+
+- A controlled component is one where React controls the form input's value via state.
+- the value displayed in the DOM always comes from React's state.
+- If a user types something, the change goes through React first
+
+code
+const NameForm = () => {
+    const [name, setName] = useState('');
+
+    return (
+        <input type="text" value={name} onChange={e => setName(e.target.value)} />
+    );
+};
+- if you see value={state} its controlled
+- React knows the value at all times 
+
+2. Uncontrolled Component
+- an uncontrolled component lets the DOM itself control the input value
+- React doesnt store it, you can just access it via a ref when needed
+
+code
+const NameForm = () => {
+    const inputRef = useRef();
+
+    const handleSubmit = () => {
+        alert(inputRef.current.value);
+    };
+
+    return (
+        <>
+            <input type="text" ref={inputRef} />
+            <button onClick={handleSubmit}>Submit</button>
+        </>
+    );
+};
+- if you see ref not value, or onChange, its uncontrolled
+
+3. Higher-Order Component HOC
+- a higher-order component is a function that takes a component and returns a new one - adding extra functionality.
+- it wraps another component
+
+code
+function withLogger(WrappedComponent) {
+    return function(props) {
+        console.log("Rendering", WrappedComponent.name);
+        return <WrappedComponent {...props} />;
+    };
+}
+
+const EnhandedButton = withLogger(Button);
+
+- if you see function withLogger(WrappedComponent) thats a HOC
+
+4. Pure Component
+- A pure component automatically skips re-rendering when its props or state hasnt changed (it does a shallow comparison)
+- this is a performance optimization
+
+code
+class MyComponent extends React.PureComponent {
+    render() {
+        console.log("Rendered");
+        return <div>{this.props.text}</div>;
+    }
+}
+- it wount rerender unless this.props.text changes
+- for function component, the equivalent is
+
+code
+const MyComponent = React.memo(({ text }) => <div>{text}</div>);
+
+- if you see PureComponent(class) or React.memo(function) its pure
+
+5. Functional Component
+- a functional component is a function that returns JSX
+- its the modern way of writing React components using hooks like useState, useEffect
+
+code
+const Greeting = ({ name }) => <h1> Hello, {name}</h1>;
+
+- if you see const Component = () => {} its a functional component
+
+6. Class Component
+- Before hooks, React used class components ES6 classes that extend React.Component and use lifecycle methods like componentDidMount
+
+code
+class Greeting extends React.Component {
+    render() {
+        return <h1> Hello, {this.props.name}<h1>;
+    }
+}
+
+7. Suspense Component
+- Suspense is a special build-in react component that allows you to wait for something (like data or lazy-loaded code) before showing UI
+- it works with features like React.lazy() and the new use hook in React 19
+
+code
+const LazyProfile = React.lazy(() => import('./Profile'));
+
+function App() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <LazyProfile />
+        </Suspense>
+    );
+}
+
+Qn) If you have a complex animation which requires manipulation of a <canvas> element, which React feature is the most likely solution to the problem
+a) portals
+b) context
+c) refs
+d) higher-order components
+d) fragments
+
+my-answer: if using elimination method. it cant be c, cant also be d. but i also dont know even what they are talking about neither the multiple choices apart from c and d. explain well all. and which topic in react this is
+
+correct-answer: c
+
+explanation
+- The HTML <canvas> element is used to draw graphics on the fly via JavaScript.
+- The canvas element is only a container for graphics which you use JavaScript to draw the graphics
+- so here, youre doing something like a game or chart using HTML. You'll need direct access to the actual DOM elements to call drawing methods like
+canvas.getContext('2d').fillRect(...);
+- In react the normal way is declarative, you describe what you render. But here you need to imperatively manipulate the DOM element. so you use refs
+- a ref in React gives you direct access to a DOM element or a component instance - bypassing React's declarative rendering
+- When we talk about React's declarative rendering, we're referring to the way React updates the UI automatically based on state or props rather than manipulating the DOM
+- Declarative rendering means, you declare what the UI should look like given some state, and React takes care of how to update the DOM to make it match. You dont tell React how to draw or change the UI.
+- But now with canvas, you cant declare what to draw with JSX because canva doesnt work that way. its just a blank surface. you need to imperatively use drawing commands like 
+ctx.fillRect(20,20,150,100);
+
+code 
+import {useRef, useEffect} from "react";
+
+const CanvasAnimation = () => {
+    const canvasRef = useRef(null);
+
+    useEffect(() => {
+        const ctx = canvasRef.current.getContext("2d");
+        ctx.fillStyle = "red";
+        ctx.fillRect(20,20,150,100);
+    }, []);
+
+    return <canvas ref={canvasRef} width={300} height={200}></canvas>;
+    };
+
+A) Portals
+- Portals lets you render children into a different part of the DOM tree, outside the parent hierachy. eg modals, tooltips, dropdowns that need to escape a parent's overflow:hidden or z-index
+
+code
+ReactDOM.createPoral(
+    <div className="modal">I'm outside the main root</div>;
+    document.getElementById('modal-root'0
+);
+- Portals are used for DOM placement, not manipulation
+
+B) Context
+- context lets you share global data (like theme, auth, or language) without passing props manually
+
+code
+const ThemeContext = React.createContext();
+
+const App = () => (
+    <ThemeContext.Provider value="dark">
+        <Toolbar />
+    </ThemeContext.Provider>
+);
+- context is for data flow not DOM manipulation
+
+E) Fragments
+- fragments lets you return multiple elements without adding an extra DOM node.
+return (
+<>
+    <h1>Hello</h1>
+    <p>World</p>
+</>
+);
+
+Qn) Your component has grown too large and contains a useEffect call that supports a requestAnimationFrame loop. Which React feature is the most likely solution to the problem?
+a) writing a custom hook for the RAF loop
+b) memoizing the RAF loop
+c) using composition to create a separate component to handle the RAF loop
+d) using a generic helper utility file for the RAF loop
+
+my-answer
+
+correct-answer: a
+
+explanation:
+step 1: what is requestAnimationFrame (RAF)
+- requestAnimationFrame is a browser API not react-specific used to create smooth and efficient animations.
+- it tells the browser "hey, before you paint the next frame, call this function"
+- the browser tries todo this roughly 60 times per second 60FPS
+- instead of manually using setInterval which can stutter or go off-sync, requestAnimationFrame runs in perfect rhythm with the browser's painting cycle.
+
+code vanilla JavaScript
+let position = 0;
+function moveBox() {
+    position += 1;
+    box.style.transform = `translateX(${position}px)`;
+    requestAnimationFrame(moveBox);
+}
+requestAnimationFrame(moveBox);
+- the browser calls moveBox() before every repaint.
+- thats how games, physics, and smooth animations run.
+step 2: How this looks inside react
+- imagine you have a React component with a useEffect that runs a RAF loop.
+
+code
+const MovingBox = () => {
+    const boxRef = useRef();
+
+    useEffect(() => {
+        let frameId;
+        let position = 0;
+
+        const animate = () => {
+            position += 1;
+            boxRef.current.style.transform = `translateX(${position}px)`;
+            frameId = requestAnimationFrame(animate);
+        };
+
+        frameId = requestAnimationFrame(animate);
+
+        return () => cancelAnimationFrame(frameId);
+    }, [];
+
+    return <div ref={boxRef} className="box" />;
+};
+- works fine but if your component grows large, handling lots of state, logic, effects and rendering this code makes it bloated and harder to maintain
+step 3	
+- so the component is doing too much (rendering + animation)
+- it breaks separation of concerns - reacts recommends each part have one responsibility
+- this is an architecture / code organization problem not performance yet
+step 4
+so, you write a custom hook for the RAF loop
+- a custom hook lets you extract reusable login (like the RAF loop) out of component while keeping its own internal state, effects and lifecycle handling.
+
+code
+function useAnimationFrame(callback) {
+    const requestRef = useRef();
+
+    const animate = time => {
+        callback(time);
+        requestRef.current = requestAnimationFrame(animate);
+    };
+
+    useEffect(() => {
+        requestRef.current = requestAnimationFrame(animae);
+        return () => cancelAnimationFrame(requestRef.current);
+    }, []);
+}
+then in your component
+const Box = () => {
+    const ref = useRef();
+
+    useAnimationFrame(() => {
+        ref.current.style.transform = `rotate(${Date.now() / 10}deg)`;
+    });
+
+    return <div ref={ref} className="box" />;
+};
+
+Qn) Consider the following code snippet
+const Foo = React.lazy(() => import("./Bar"));
+Which concept does this best illustrate
+a) code splitting
+b) context
+c) higher-order components
+d) forwarding refs
+e) portals
+
+my-answer: trick question this one. coz answer in my opinion is not b, context is for using global states, not c a HOC is for wrapping other components, e its not a portal because portals are for rendering children into different parts of the dom say when you want to use a modal. so i dont really know
+
+correct-answer: A
+
+explanation:
+- this is react's performance optimization
+- React's React.lazy is a built-in function that allows you to dynamically imports a component.
+- the Bar component isnt loaded when your app starts.
+- its only loaded when you actually render <Foo />
+- so the browser doesnt download the code for Bar until Foo  is needed.
+- this is lazy loading. lazy loading is a part of a bigger concept called code splitting.
+
+Qn) JSX doesn't sanitize text contents by default. If you have contents that could contain data that's from an untrusted source, it's important to escape it manually
+a) true
+b) false
+
+my-answer:
+
+correct-answer: b
+
+explanation:
+topic is react security & JSX Renderin behaviour  (XSS (Cross-Site Scripting), Data sanitization, dangerouslySetInnerHTML, safe rendering of untrusted data)
+- Sanitizing means cleansing or escaping data so that it cannot run malicious code inside your app.
+- think of it as protecting your users from hackers who might try to inject harmful scripts.
+eg,
+
+code
+<div>{userComment}</div>
+
+- imagine someone posts this as a comment
+
+code
+<script>alert('Hacked!')</script>
+
+- if react didnt sanitize that, the browser would execute that script. This is called XSS Cross-Site Scripting a major web security flaw
+- so now, react automatically escapes (sanitizes) everything inside {} in JSX.
+- so if the user writes that script, react will render it as a text not as read Javascript
+- react will not sanitize only when you manually tell it to inject raw HTML, say
+
+code
+<div dangerouslySetInnerHTML={{ __html: userComment }} />
+- this bypasses reacts safety and if the userComment has a script, then boom. your vulnerable
+- thats why its called dangerouslySetInnerHTML
+- use it only if;
+- you fully trust the content or youve sanitized it yourself with a library like DOMPurify
+
+Qn) You can use custom attributes on nodes in JSX, but they have to be entirely lowercase
+a) true
+b) false
+
+my-answer: weh, false
+
+correct-answer: b
+
+explanation:
+Topic - JSX, DOM Attributes, custom props
+- when you write JSX like
+
+code
+<div className="box" data-user-id="123"></div>
+
+- react compiles it to something like
+React.createElement('div', {className: 'box', 'data-user-id': '123' });
+- so you can add custom attributes on nodes in JSX but really doesnt have to be lowecase
+<div data-user="123" />      // ✅ Standard custom data attribute
+<div customattr="hello" />   // ✅ Works fine in React 16+
+<div customAttr="hello" />   // ✅ Also works, React won’t change the case
+So — it’s not true that they “must be entirely lowercase.”
+- React uses JavaScript naming conventions not HTML's for its attributes
+HTML Attribute	 JSX Equivalent	  Why
+class	         className	  Because class is a reserved word in JavaScript
+for	         htmlFor	  Because for is a JS keyword, and React expects camelCase for DOM properties
+tabindex	 tabIndex	  Follows camelCase for DOM property names
+onclick	         onClick	  Event handlers are camelCase
+maxlength	 maxLength	  DOM property is camelCase
+readonly	 readOnly	  Same reason
+
+HTML Event	JSX Equivalent
+onclick	        onClick
+onchange	onChange
+onfocus	        onFocus
+onblur	        onBlur
+onmouseover	onMouseOver
+3. Boolean Attributes
+In HTML you might write:
+<input disabled>
+In JSX, you must provide an explicit boolean:
+<input disabled={true} />
+or shorthand:
+<input disabled />
+✅ React interprets disabled without value as true.
+Inline Styles
+In HTML:
+<div style="color: red; background-color: blue;"></div>
+In JSX:
+<div style={{ color: 'red', backgroundColor: 'blue' }}></div>
+7. Self-Closing Tags
+JSX requires self-closing syntax for void elements:
+<br /> <img /> <input /> <hr /> <meta /> <link />
+❌ This would fail:
+<br>
+8. Custom Components (Capitalized Names)
+React differentiates between:
+Lowercase names → built-in HTML elements (div, span)
+Uppercase names → your custom React components (Button, Card)
+Example:
+function Card() { return <div>Hi</div>; }
+<Card />  // ✅ React component
+<div />   // ✅ HTML element
+
+Qn) PureComponents is useful when you have deeply-nested, complex state to avoid updates
+a) true
+b) false
+
+my-answer: what i know is that a pureComponent is used when one wants to do a shallow comparison. it would skip rendering if the props havent changed. so i dont know if its useful in deeply-nested states. but i feel like its work really is to avoid unnecessary updates. so id go with a
+
+correct-answer: b
+
+explanation
+-  a purecomponent is a react class component that automatically implements a shouldComponentUpdate() todo a shallow comparison between props and state. if neither props nor state appear to change, it skips rerendering
+- a purecomponent only does a shallow comparison meaning it checks references not deep nested values
+- so if you have
+
+code
+state = {
+    user: {name: "Immanuel", age: 25}
+};
+- and you update it like this
+this.state.user.name = "John"; // mutation, same reference
+this.setState({ user: this.state.user });
+- react sees the same reference and assumes nothing changed. and skipps render even though the nested name changed.
+- thats why purecomponent is not useful for deeply-nested or complex states.
+- you'd need either 
+- immutable stat updates or a deep comparizon
+
+Qn) Consider the following code
+<Foobar autocomplete />
+What's the value of autocomplete
+
+my-answer: true. (haha, you see when you explain to me something well i'll get the next question. thats what i want you todo. because this weve already covered in your excellent and succinct explanations
+
+correct-answer: true
+
+explanation:
+- the presence of the attribute means true.
+so its same as
+<Foobar autocomplete={false} />
+<input autocomplete>        ✅ true
+<input>                     ✅ false (no autocomplete attr)
+
+Qn) 
+
+
