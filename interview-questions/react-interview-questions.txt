@@ -1,3 +1,4 @@
+28.10.25
 Qn) If you'd like to use an existing component as a black box for composing another component's functionality, which technique is the most likely solution to the problem?
 a) lifting state to the parent
 b) inheritance
@@ -914,6 +915,729 @@ so its same as
 <input autocomplete>        ✅ true
 <input>                     ✅ false (no autocomplete attr)
 
-Qn) 
+28.10.25
+React Testing Library
+- test types
+   test type - what it checks - example
+i) Unit test - Does this function or component behave as expected? - Does Button show the right text
+ii) Integration test - Do multiple components work together? - Does clicking "submit" trigger the form handler?
+iii) End-to-end (E2E) - Does the whole appwork from the user's perspective - Can a user log in and see their dashboard
+
+- common testing libraries
+i) Jest (the test runner)
+- is the core testing framework for React.
+- comes preconfigured with Create React App
+- ati you almost always use jest, no matther what library you pick.
+
+code
+test('adds 1 + 2 equals 3', () => {
+    expect(1 + 2).toBe(3);
+})
+
+ii) React Testing Library (RTL) - modern standard
+- Built ontop of Jest
+- focuses on how users interact with your app, not the internal implementation
+- encourages testing behaviour, not structure
+- RTL simulates real user interactions (typing, clicking, seeing text)
+
+code
+import { render, screen, fireEvent } from "@testing-library/react";
+import App from './App';
+
+test('button click shows message', () => {
+    render(<App />);
+    fireEvent.click(screen.getByText('Show'));
+    expect(screen.getByText('Hello Immanuel')).toBeInTheDocument();
+});
+
+command to download
+> npm install --save-dev @testing-library/react @testing-library/jest-dom
+
+code
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import App from './App';
+
+test('displays welcome message', async () => {
+    render(<App />);
+    await userEvent.click(screen.getByText('Show Message'));
+    expect(screen.getByText('Welcome, Immanuel!)).toBeInTheDocument();
+});
+
+Qn) React Testing Library differs from Enzyme in that it helps you test implementation details to ensure the internals of the component behave exactly as they should
+a) true
+b) false
+
+my-answer: b ive seen that RTL test how users interact with the app and not the internal details
+
+correct-answer: b
+
+explanation:
+Enzyme tests the intenals. the implementation details
+React Testing Library 
+"“The more your tests resemble how your software is used, the more confidence they can give you.”
+- RTL focuses on what the user sees and does, not on the implementation.
+
+code
+render(<Counter />);
+fireEvent.click(screen.getByText('Increment'));
+expect(screen.getByTex('Count: 1')).toBeInTheDocument();
+- here we test behavior. Not how the component updates state, but whether the output and UI respond correctly.
+- RTF helps you test user-facing behavour not implementation details
+
+Qn) screen queries are generally preferred over render queries in RTL
+a) true
+b) false
+
+my-answer:
+
+correct-answer: a
+
+explanation:
+this question falls under React Testing Library fundamentals - specifically:
+"Queries and best practices for accessing elements in the DOM during tests"
+- when you write tests, you first render your component, then query (find) elements inside it to test their behavior.
+
+step 1: what render() does
+when you call:
+
+code
+render(<MyComponent />);
+RTL:
+-creates a virtual DOM for your component
+-returns several query functions that you can use to find elements eg getByText,getByRole
+-also registers your rendered component inside a global object called screen.
+step 2: what are render queries
+- these are queries returned directly from the render() function
+
+code
+const { getByText } = render(<App />);
+const button = getByTest('Submit);
+- works but can get messy when you have many tests because you have to destructure from render() in each test, and its not obvious which screen is being referred to
+step 3: what are screen queries
+-instead of destructuring from render, RTL lets you use the global screen object.
+
+code
+render(<App />);
+const button = screen.getByText('Submit);
+- screen object is like a shortcut. it automatically points to the current rendered DOM
+
+Common Query Types
+Query - Example - Use case
+getByText - screen.getByText("Hello") - Find visible text
+getByRole - screen.getByRole("button") - Find by accessibility role
+getByLabelText - screen.getByLabelText("Email") - For form inputs
+getByPlaceholderText - screen.getByPlaceholderText("Search...") - For input placeholders
+getByTestId - screen.getByTestId("submit-btn") - When no better selector exists
+queryBy - scree.queryByText("Error") - Return null if not found
+findBy - await screen.findByText("Loaded!") - For async elements
+
+Qn) It's important to add cleanup() to an afterEach block since RTL doesn't do this automatically in a typical testing setup.
+a) true
+b) false
+
+my-answer: i honestly dont know
+
+correct-answer: b
+
+explanation:
+when you call render(<Component />) in a test, RTL mounts your component in a simulated DOM provided by jsdom.
+- after each test runs, you usually want to remove that DOM so that the next test starts afresh - no leftover elements, no state leaks, no memory issues.
+- now, before react testing library version 9+ you had to call cleanup() manually inside afterEach() otherwise the rendered component would persist between tests. 
+- since react testing library v9, and Jest setups like create React App or vite, cleanup() runs automatically after each test.
+- no manual cleanup required
+- so you can have
+
+code
+import { render, screen } from '@testing-library/react';
+import App from './App';
+
+test('renders', () => {
+    render(<App />);
+    expect(screen.getByText(/hello/i)).toBeInTheDocument();
+});
+
+Qn) The RTL philosophy is to not test implementation details. One drawback to this is that 100% code coverage is typically impossible
+a) true
+b) false
+
+my-answer: i know that RTL tests user interface not implementation details but i dont know if it covers everything
+
+correct-answer: a
+
+explanation:
+- RTL tests outcomes not internal mechanics
+- it does not test internal state, functions or hooks directly, rather it tests only what the user can see or do eg clicks, typing
+- code coverage is a metric showing how much of your code was executed during testing.
+- tools like jest --coverage measure this
+- eg 100% line coverage means every line of code run at least once during a test
+- BUT, and this is key coverage does not mean meaningful testing. you could hit every line but still not validate correct behavior.
+- since RTL intentionally ignores implementation details, some parts of your code might never be directly triggered by user interactions
+eg
+
+code
+function computeDiscount(price) {
+    return price * 0.9;
+}
+
+function Cart(){
+    const total - computeDiscount(100);
+    return <p>Total: {total}</p>;
+}
+RTL test
+expect(screen.getByText('Total: 90')).toBeInTheDocument();
+
+Qn) When testing custom hooks directly, which rendering call would help eliminate the necessity of a component wrapper
+
+my-answer:
+
+correct-answer: renderHook()
+
+explanation:
+- hooks cant live alone
+- react hooks like useState, useEffect or your custom useFetch can only be used inside function components.
+- react will throw errors if you run them in isolation
+- so when you want to test a hook, you must render it inside a component somehow. and this is where testing utilities come in.
+step 2: the old way: wrapping a test component manually
+- before specialised tools existed, people wrote something like this:
+
+code 
+function TestComponent() {
+    const value = useCustomHook();
+    return <p>{value}</p>;
+}
+
+render(<TestComponent />);
+- this works but every time you need to test a single hook, you'll need and extra wrapper component.
+step 3: the modern way -renderhook from RTL
+- RTL provides a dedicated API for this
+
+code
+import { renderHook } from '@testing-library/react';
+
+const { result } = renderHook(() => useCustomHook());
+- now you dont need a manual wrapper - the hook runs in a tiny "virtual" component behind the scenes/
+- now you can access
+result.current -> the current value the hook returns
+rerender() -> re-run the hook with new props.
+waitForNextUpdate() -> wait for async hooks to finish
+- hooks depend on React's lifecycle - so we cant call them directly like functions.
+- renderHook creates a tiny "fake component" behind the scenes
+so
+this is same as that
+
+code
+const { result } = renderHook(() => useCounter());
+
+code
+function TestComponent() {
+    const hookValue = useCounter();
+    return null;
+}
+
+render(<TestComponent />);
+
+Qn) Choose the selection ordering from most to least preferred, with most preferred towards the beginning (left) and least preferred towards the end(right) of the list
+a) aria role, test id, text
+b) aria role, text, test id
+c) test id, aria role, text
+d) test id, text, aria role
+e) text, aria role, test id
+f) text, test id, aria role
+
+my-answer: manh ive not even seen anything like this. how will i pass an interview of equivalent nature if every question is new. but i know slowly this will go away. and what topic is this too? and what else do i need to know. after reading a little i guess e
+
+correct-answer: b
+
+explanation:
+topic is query priority and accessibility best practices
+- testing whether you know which queries to use first when finding elements in your tests.  
+- RTL has a philosophy "The more your tests resemble how the app is used, the more confidence they can give you"
+- this means you should query elements the way a read user or assistive technology would find them
+step 2: what "query ordering" means
+- when youre testing, you need to find an element before interacting with or asserting on it.
+
+code
+screen.getByText('Submit');
+screen.getByRole('button', { name: /submit/i });
+screen.getByTestId('submit-btn');
+- from the React Testing Library docs
+- always try to select elements the same way the user would find them
+1. role getByRole('button', {name: /submit/i} ) - is most accessible matches to how assistive tech finds elements
+2. test getByText('Submit') - matches what user visually sees
+3. test ID getByestId('submit-btn') - not user-facing - only use when there is no other way
+
+code 
+<button aria-label="Send message">📨</button>
+a screen reader will announce " Button, Send Message. if you test using the flag, getByText, it might break if you change the emoji but getByRole('button', {name : /send message/i}) will work
+
+Full query hierachy from RTL docs
+from most preferred to least preferred
+1. getByRole
+2. getByLabelText (for form inputs)
+3. getByPlaceholderText
+4. getByText
+5. getByDisplayValue (fpr inputs showing value)
+6. getByAltText (for images)
+7. getByTitle
+8. getByTestId (last resort)
+
+Qn) Which matchers arent part of the base React Testing Library?
+choose all correct answers below
+a) .toBeDisabled()
+b) .toBeInTheDocument()
+c) .toHaveTextConent()
+d) .toMatchSnapshot()
+
+my-answer: i know definitly b is there. ive not seen a,c,d anywhere. but d feels correct if you are working with files and images i dont know. okay i really dont know
+
+correct-answer: a,b,c,d (all of them are not part of the base React Testing Library)
+
+explanation:
+- a matcher is part of a test that asserts something.
+- its what follows expect() in Jest or RTL tests
+
+code
+expect(button).toBeDisabled()
+expect(link).toBeInTheDocument()
+expect(title).toHaveTextContent('Hello world')
+
+- base jest matchers come from jest itself are
+toBe()
+toEqual()
+toContain()
+toMatchSnapshot()
+
+React Testing Library primarily utilizes Jest's built-in matchers and extends them with custom matchers provided by @testing-library/jest-dom.
+Jest Matchers:
+Jest provides a rich set of matchers for general value comparisons and assertions, including:
+Equality: toBe(), toEqual(), toStrictEqual()
+Truthiness: toBeTruthy(), toBeFalsy(), toBeNull(), toBeUndefined(), toBeDefined()
+Numbers: toBeGreaterThan(), toBeLessThan(), toBeGreaterThanOrEqual(), toBeLessThanOrEqual(), toBeCloseTo()
+Strings: toMatch(), toContain()
+Arrays/Iterables: toContainEqual(), toHaveLength()
+Objects: toHaveProperty(), toMatchObject()
+Functions: toHaveBeenCalled(), toHaveBeenCalledTimes(), toHaveBeenCalledWith(), toHaveReturned(), toHaveReturnedTimes(), toHaveReturnedWith()
+Exceptions: toThrow(), toThrowError()
+Promises: resolves, rejects
+
+- you can use them to even test plan JavaScript not just React.
+- RTL itself doesn not include matchers directly. it relies on an addon package called 
+@testing-library/jest-dom
+- they have
+.toBeInTheDocument()
+.toBeDisabled()
+.toHaveTextContent()
+.toHaveAttribute()
+.toBeVisible()
+
+@testing-library/jest-dom Custom Matchers:
+This library enhances Jest with DOM-specific matchers, making tests more readable and declarative when working with React components:
+toBeInTheDocument(): Checks if an element is present in the document.
+toBeVisible(): Checks if an element is visible to the user.
+toBeDisabled(), toBeEnabled(): Checks the disabled/enabled state of form elements.
+toBeChecked(), toBePartiallyChecked(): Checks the checked state of checkboxes/radio buttons.
+toContainElement(), toContainHTML(): Checks if an element contains another element or specific HTML.
+toHaveAttribute(), toHaveClass(), toHaveFocus(), toHaveStyle(): Checks for specific attributes, classes, focus state, or inline styles.
+toHaveTextContent(): Checks the text content of an element.
+toHaveValue(), toHaveDisplayValue(): Checks the value of form elements.
+toBeEmptyDOMElement(): Checks if an element has no children.
+toHaveAccessibleName(), toHaveAccessibleDescription(): Checks for accessible names and descriptions (e.g., from aria-label, alt text).
+These matchers are used in conjunction with the expect() function, for example:
+JavaScript
+
+expect(screen.getByText('Submit')).toBeInTheDocument();
+expect(screen.getByRole('button', { name: /submit/i })).toBeDisabled();
+expect(screen.getByTestId('my-element')).toHaveTextContent('Hello');
+
+- so as you realise, these markers come from Jest or @testing-library/jest-dom not RTL itself. and btw only d is from the jestCore the rest come from @testing-library/jest-dom
+
+- RTL itself gives you 
+render(), screen, fireEvent(), waitFor(), userEvent but these are not mathers.
+- RTL provides queries not matchers.
+
+Qn) What is @testing-library/jest-dom
+its a library that extends Jest's expect() with DOM-aware matchers, like toBeInTheDocument() and toHaveTextContent() making tests more readable and aligned with how users see the app
 
 
+wrong way - using eg getBy which is Synchronous
+const { getByText } = render(<UserGreeting />);
+expect(getByText("Hello Immanuel")).toBeInTheDocument();
+// Fails immediately since its not yet rendered
+correct way - using findBy which is Asynchronous
+const { findByText } = render(<UserGreeting />);
+const greeting = await findByText("Hello Immanuel");
+expect(greeting).toBeInTheDocument();
+
+Greetings.test.js
+import { render, screen, waitFor } from "@testing-library/react";
+import Greeting from "./Greeting";
+
+test("getBy - finds existing element instantly", () => {
+    render(<Greeting />);
+    // the text loading appears immediately
+    const loader = screen.getByText("Loading...");
+    expect(loader).toBeInTheDocument();
+});
+
+// at this moment if you tried
+// screen.getByText("Hello, Immanuel") it would throw an error
+
+// queryBy
+test("queryBy - Check element absense", () => {
+    render(<Greeting />);
+    // Hello Immanuel doesnt exist yet
+    const greeting = screen.getByText("Hello Immanuel");
+    expect(greeting).toBeNull();  // this is a safe check. it returns null
+})
+
+// findBy - asynchronous
+test("findBy - returns a promise so you must wait for it", async () => {
+    render(<Greeting />);
+    const greeting = await screen.findByText("Hello Immanuel");
+    expect(greeting).toBeInTheDocument();
+});
+// automatically retires for upto one second by default
+
+// waitFor - waits for any condition you define
+// use when you cant directly findByText but need to wait for some condition to become true
+test("waitFor - wait for condition", async () => {
+    render(<Greeting />);
+
+    await waitFor(() => {
+        expect(screen.getByText("Hello Immanuel")).toBeInTheDocument();
+    });
+});
+
+example two
+
+code
+Greeting.js
+export default function Greeting({ name }) {
+    return (
+        <div>
+        <h1>Hello {name}</h1>
+        <button disabled>Click me</button>
+        </div>
+    );  
+}
+
+- here is a test fine without jest-dom
+Greetings.test.js
+import { render, screen } from '@testing-library/react';
+import Greeting from './Greeting';
+
+test('renders greeting text', () => {
+    render(<Greeting name="Immanuel" />);
+    const heading = screen.getByText("Hello Immanuel");
+
+    // these are jest base matchers only
+    expect(heading).toBeTruthy();  // works
+    expect(heading.textContent).toBe(Hello Immanuel);  // manual check
+
+    // but this will fail
+    // expect(heading).toBeInTheDocument();
+    // expect(button).toBeDisabled();
+    // because these matchers dont exist
+})
+
+- now using jest-dom
+> npm install --save-dev @testing-library/jest-dom
+
+SetupTests.js
+import "@testing-library/jest-dom";
+import { render, screen } from "@testing-library/react";
+import Greeting from './Greeting';
+
+test('renders greeting text', () => {
+    render(<Greeting name="Immanuel" />);
+
+    const heading = screen.getByText("Hello Immanuel");
+    const button = screen.getByRole("button");
+
+    // these can now work coz of @testing-library/jest-dom
+    expect(heading).toBeInTheDocument();
+    expect(button).toBeInTheDocument();
+    expect(heading).toHaveTextContent("Hello Immanuel");
+});
+
+Matcher	What it checks
+.toBeInTheDocument()	element exists in DOM
+.toBeVisible()	visible to the user
+.toBeDisabled()	disabled form control
+.toHaveTextContent('text')	contains this text
+.toHaveAttribute('attr', 'value')	has this attribute
+.toHaveClass('classname')	has this CSS class
+.toHaveValue('value')	has input value
+
+
+Qn) If you use a getBy method, no expect assertion is strictly necessary
+a) true
+b) false
+
+my-answer: i feel like a, because maybe before RTL 19 you had to expect but now it does internally. oh no my answering language grammah is also off. i want you to answer these questions in a manner i can get that language necessary for interviews or talk shows
+
+correct-answer: a
+
+explanation:
+"When using getBy queries in RTL, an explicit expect() assertion isnt strictly required. The getby method itself throws an error if the element can't be found, which automatically fails the test. However in practice, most developers still include an expect() statement for clairty and readability"
+- When you use a getBy query in React Testing Library, it immediately throws an error if the element cannot be found in the DOM.
+- That behaviour alone is enough to fail the test. even if you never get to write the expect() statement. 
+
+test("renders greeting message", () => {
+    render(<Greeting />);
+
+    screen.getByText("Hello Immanuel");
+});
+// if element doesnt exist you'll see, unable to find an element with the text: Hello Immanuel
+
+
+// preferred
+test("renders a greeting test with cleaner approach", () => {
+    render(<Greeting name="Immanuel" />);
+
+    expect(screen.getByText("Hello Immanuel")).toBeInTheDocument();
+});
+
+Qn) If you want to assert that an element does not exist in the document, queryBy is the preferred selection method
+a) True
+b) False
+
+my-answer: 
+
+correct-answer: true
+
+explanation:
+"Yes, true. The queryBy family of queries in React Testing Library RTL is specifically designed for checking whether elements donot exist in the DOM. Unlike getBy which throws an error if it doesnt find an element, queryBy simply returns null, which makes it ideal for safe assertions about absence — for exaple, verifying that a loading spinner or an error message has disappeared."
+
+code 
+test("the error message should not be visibe initially", () => {
+    render(<Greeting />);
+    const errorMessage = screen.queryByText("Invalid Credentials");
+    expect(errorMessage).toBeNull(); // safe & clear
+})
+- if you use getByText it would throw immediately and test would crash even though its actually correct but the error message wasnt supposed to be there yet
+
+code
+test("the spinner disappears after the loading", () => {
+    render(<Greeting />);
+    // spinner exists initially
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    // wait for final render
+    await screen.findByText("Hello, Immanuel");
+    // now spinner should be gone
+    expect(screen.queryByText("Loading...")).toBeNull();
+})
+
+Qn) If you use getByTestId and there are multiple elements matched, the first one is returned.
+a) true
+b) false
+
+my-answer: i think you need to ask me two questions on this topic every time i ask you one. because weh, the depth of this topic is alarming. but i guess true. i think the first one is returned because it will go to the next line and not crash
+
+correct-answer: false
+
+explanation:
+when you use getByTestId, React Testing Library will throw an error if more than one elements match the query. 
+- it never just picks the first one. this is the way it allows you to recognize multiples
+
+eg
+code
+App.jsx
+export default function App(){
+    return (
+        <>
+        <button data-testid="save-btn">Save</button>
+        <button data-testid="save-btn">Save As</button>
+        </>
+    );
+}
+
+App.test.js
+import { render, screen } from "@testing-library/react";
+import App from "./App";
+
+test("getByTestId with duplicates", () , => {
+    render(<App />);
+    screen.getByTestId("save-btn"); // throws an error
+});
+- to handle multiple matches, you must use getAllByTestId
+
+code
+const buttons = screen.getAllByTestId("save-btn");
+expect(buttons).toHaveLength(2);
+
+Qn) Why might relying too heavily on getByTestId be considered a bad practice in React Testing Library
+a) Because it slows down tests
+b) Because it ignores accessibility and real user behavior
+c) Because its deprecated
+d) Because it requires special configuration
+
+answer: b) because it ignores accessibility and real user behavior
+
+explanation:
+RTL core philosophy is "the more your tests resemble how the app is used, the more confidence they give you"
+- so it encourages using
+getByRole("button", {name: /submit/i })
+getByLabelText("Email")
+getByText("Welcome")
+before resorting to artificial selectors like data-testid
+
+Qn) A good use case for the baseElement option for render is testing ..
+a) animation effects
+b) deeply-nested component trees
+c) render props
+d) portals
+
+my-answer: now again, im seeing a question new to my eye. this is what we said we dont want. so let the two questions after each question i give you to be somehow broader in nature and the other one a deeper concept about this topic on the question
+
+correct-answer: d portals
+
+explanation:
+- when you use render in React Testing Library, it creates a fake DOM using JSDOM, with a single container element usually document.body
+- by default, all rendered components attach to that root.
+- but some components like portal, render their children outside of the normal React tree, usually to another DOM node like a modal root.
+
+Modal.js
+import ReactDOM from "react-dom";
+
+export default function Modal({ children }) {
+    return ReactDOM.createPortal(
+        children,
+        document.getElementById("modal-root"); // a different part of DOM
+    );
+}
+- when you test this, your modal wount show up in the default container because its rendered somewhere else
+- so in your test you do this
+import { render, screen } from "@testing-library/react";
+import Modal from "./Modal";
+
+test("renders modal in poral, () => {
+    const modalRoot = document.createElement("div");
+    modalRoot.setAttribute("id", "modal-root");
+    document.body.appendChild(modalRoot);
+
+    render(<Modal><p>Portal content</p></Modal>, {baseElement: document.body});
+
+    expect(screen.getByText("Portal content")).toBeInTheDocument();
+});
+- so baseElement helps us to include elements outside the main container like modals or portals when searching the DOM.
+Concept Purpose                                                               
+container -  The default DOM node that your component renders into                                                              |
+baseElement - The *root of the DOM tree* RTL should search in (useful when elements render outside the container — e.g. portals) 
+- baseElement is useful for testing portals, modals and toasts which renders in another DOM
+
+Qn) When testing portals, why might screen.debug() not show your portal content unless you pass { baseElement: document.body } ?
+Because screen.debug() only logs the container by default. the portals render outside of that. 
+
+Qn) Which render method would be most likely to be useful to check for memory leaks?
+a) asFragment
+b) cleanup
+c) container
+d) unmount
+
+my-answer: again im seeing something i dont know. answer this and then two others. aim is to cover as much as possible in order not to hear somethingg new in an interview
+
+correct-answer: d) unmount
+
+explanation:
+Memory Leaks in React tests
+- a memory leak happens when a component or resource stays in memory after its supposed to be.
+- this means, you have an ongoing setInterval, setTimeout, fetch() call and your component unmounts without cleaning it up.
+
+code
+function Timer()
+{
+    useEffect(() => {
+        const interval = setTimeout(() => console.log("tick"), 1000);
+        return () => clearInterval(interval);
+    }, []);
+    return <p>Running timer...</p>;
+}
+
+// if you forget to clear the interval, React might warn you:
+
+- using render() from React Testing Library RTL, there are a few utility methods one of them being unmount()
+
+import { render } from '@testing-library/react'
+import Timer from './timer';
+
+test("cleans up on unmount", () => {
+    // we destructure on the fly instead of doing
+    // render(< Timer />);
+    const { unmount } = render(<Timer />);
+    unmount(); // this simulates a component being removed
+    // then check if there are no memory leak warnings or console errors
+})
+- so if your component did not clean up properly, unmount will help reveal that.
+option - meaning - why not correct
+- asFragment - Returns a snapshot-friendly DOM fragment for comparing renders - used for snapshot testing, not cleanup
+- cleanup - global cleanup after tests (unmounts all components automatically) - used automatically by jest setup not for checking leaks
+- container - the DOM node used for rendering - this is just a reference and is not related to memory cleanup
+
+Qn) Difference between unmount() and cleanup()
+- while cleanup() is called automatically, you need to define an unmount() method to check say for memory leaks
+- while cleanup() affects all components rendered globally after tests, unmount() affects one component rendered by a specific render()
+
+- render()- puts your component on stage
+- unmount()- removes one actor
+- cleanup()- cleans the whole stage after each performance
+
+Qn) The rendered container property is the typical way to run queries and traverse the DOM tree
+a) true
+b) false
+
+my-answer: true
+
+correct-answer: false
+
+explanation:
+when you call React Testing Library's render() function, it returns an object with several utilities
+
+code
+const { container, getByText, queryByRole, asFragment, unmount } = render(<App />);
+- one of those utilities is container, which is the root DOM node that RTL used to render your component  
+- so yes you can use container to manually traverse the DOM
+eg
+
+code
+expect(container.querySelector("button")).toBeInTheDocument();
+- but again RTL philosophy is " the more your test resemble how your software is used, the more confidence they can give you "
+- tests should use queries that mimic how a user interacts like
+- getByRole("button", { name: /submit/i })
+getByText("Save")
+getByLabelText("Username")
+
+code
+expect(screen.getByRole("button", {name: /submit/i })).toBeInTheDocument();
+
+"The container property gives you direct access to the underlying DOM, but its not the typical way to query elements in React Testing Library. RTL encourages using screen or semantic queries like getByRole or getByText, which reflect real user interactions and imporve test reliability"
+
+Qn) What is the difference between using screen and destructuring queries from render()
+both are valid but screen is preferred.
+- it provides a global query scope. and makes your tests easier to read esp when you have multiple renders in one test file.
+
+code 
+// old way
+const { getByText } = render(<App />);
+getByText("Login");
+
+//preferred way
+render(<App />);
+screen.getByText("Login");
+
+Qn) When might it be acceptable to use container
+- when youre testing non-accessible content or pure DOM structure
+eg verifying CSS class presence or SVG structure
+- youre snapshot testing markup with asFragment() or container.firstChild
+
+eg
+code
+const { container } = render(<Icon />);
+expect(container.querySelector("svg")).toBeInTheDocument();
+
+Qn) Mocking useState isnt a good idea. This is an implementation detail and isn't public from outside the component
+a) true
+b) false
+
+my-answer: ive never heard of mocking useState in RTL
