@@ -1549,7 +1549,7 @@ code
 function Timer()
 {
     useEffect(() => {
-        const interval = setTimeout(() => console.log("tick"), 1000);
+        const interval = setInterval(() => console.log("tick"), 1000);
         return () => clearInterval(interval);
     }, []);
     return <p>Running timer...</p>;
@@ -1574,6 +1574,42 @@ option - meaning - why not correct
 - asFragment - Returns a snapshot-friendly DOM fragment for comparing renders - used for snapshot testing, not cleanup
 - cleanup - global cleanup after tests (unmounts all components automatically) - used automatically by jest setup not for checking leaks
 - container - the DOM node used for rendering - this is just a reference and is not related to memory cleanup
+
+eg) a component that leaks memory
+import React, { useEffect, useState } from "react";
+
+export default function Timer() {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+        // forgot to clear interval
+        const interval = setInterval(() => {
+            setCount(c => c + 1);
+        }, 1000);
+        // toadd
+        // return () => clearInterval(interval);
+    }, []);
+
+    return <p>{count}</p>;
+};
+
+- when you conduct this test with the conde above to unmount, you will get a warning in the console logs.
+to fix, clean the timer
+
+- now as we are introducing the topic on jest and spy and mock
+- you can spy or mock on the setInterval and clearInterval to make sure that the cleanup function actually runs:
+test("calls clearinterval when unmounted", () => {
+    jest.useFakeTimers();
+    const clearSpy = jest.spyOn(global, "clearInterval");
+
+    const { unmount } = render(<Timer />);
+    unmount();
+
+    expect(clearSpy).toHaveBeenCalled();
+    jest.useRealTimers();
+});
+
+"In React Testing Library, i would use unmount() to simulate the component being removed and its side effects, cleaned up properly. It is usefull for detecting memory leaks caused by forgotten intervals forexample, timeouts, subscriptions. RTL's cleanup() handles teardown automatically, while unmount() gives presise control within a single test.
 
 Qn) Difference between unmount() and cleanup()
 - while cleanup() is called automatically, you need to define an unmount() method to check say for memory leaks
@@ -1636,8 +1672,390 @@ code
 const { container } = render(<Icon />);
 expect(container.querySelector("svg")).toBeInTheDocument();
 
+08.11.25|sato
 Qn) Mocking useState isnt a good idea. This is an implementation detail and isn't public from outside the component
 a) true
 b) false
 
 my-answer: ive never heard of mocking useState in RTL
+
+07.11.25|Fri
+Qn) What is jest.spyOn and mocking?
+- A mock in testing is a fake version of something real. eg a function, API, module, or Object - that you can control in a test
+- You spy or mock a function when you want to
+i) Track if it was called
+ii) Control what it returns
+iii) Prevent it from performing its real action (eg network call, timer)
+
+ToDo
+- write a program that is a test function. full
+
+eg)
+code
+test("calls clearInterval when unmounted", () => {
+    jest.useFakeTimers(); // control timers manually
+    const clearSpy = jest.spyOn(global, "clearInterval");
+
+    const { unmount } = render(<Timer />);
+    unmount();
+
+    expect(clearSpy).toHaveBeenCalled();
+    jest.useRealTimers();
+})
+
+08.11.25|Sato
+- the useFakeTimers(), replaces real timers (setInterval, setTimeout) with mock timers that you can control manually from your tests.
+- the useRealTimers(), restores normal timers after test
+- the .toHaveBeenCalled(), is a Jest marker that checks if a function was called.
+
+so back to the former question
+qn) Mocking a useState is not a good idea. This is an implementation detail and isn't public from outside the component.
+a) true
+b) false
+
+explanation:
+- In React Testing Library, the philosophy is, "Test the behavior, not the implementation"
+- the useState is normally internal and not public API. you cant access it directly as a user, and your test should never assume how a component manages its state.
+- so in RTL, mocking a useState like this below is considered a bad practice or an anti practice
+
+eg)
+code
+jest.spyOn(React, "useState").mockImplementation(() => ["mocked value", jest.fn()]);
+- like this, you replace the internal useState hook with a fake one.
+- it lets you force state changes without you interacting with the component.
+- so instead of mocking state, simulate the user transaction, causing the state change.
+
+eg)
+code
+function Counter(){
+    const [count, setCount] = useState(0);
+
+    return (
+        <>
+        <p>Count: {count}</p>
+        <button onClick=(() => setCount(count + 1))>Increment</button>
+        </>
+    );
+}
+
+bad test
+jest.spyOn(React, "useState").mockImplementation(() => [10, jest.fn()]);
+render(<Counter />);
+expect(screen.getByText("Count 10")).toBeInTheDocument();
+// here, the mockImplementation replaces how the useState behaves temporarily. instead of returning [0, setCount], it returns [10, jest.fn()];
+// when your component rerenders, it thinks the initial value is 10 even though the real code is 0
+
+good test
+render(Counter />);
+fireEvent.click(screen.getByText("Incremeant"));
+expect(screen.getByText("Count: 1")).toBeInTheDocument();
+
+"so, mocking useState isnt a good idea because a useState is an internal detail of the component. RTL recommends testing user behavior through user interactions eg clicking, typing, etc rather than mocking implementation details"
+
+Qn) What is the difference of testing implementation details and testing behavior?
+Implementation details - this is how the component achieves something. eg using useState, useEffect, internal variables
+Behavioral test - what the user can observe or do eg button click updates test, form submit success.
+
+eg)
+code
+// implementation details
+expect(mockUseState).toHaveBeenCalled();
+
+// behavioral test
+fireEvent.click(button);
+expect(screen.getByText(/submitted/i)).toBeInTheDocument();
+- behavioral tests are more stable even if internal components are changed.
+
+Qn) When is mocking acceptable in React Testing Library?
+
+explanation
+when testing external dependancies not internal details.
+i) mocking API calls (like axios or fetch)
+ii) mocking local storage like localStorage or analytics
+iii) mocking custom hooks that fetch data from custom sources.
+
+eg)
+code
+jest.mock("../useFetchUser", () => ({
+    useFetchUser: () => ({name: "Immanuel", loading: false}),
+}));
+
+- part of the core of RTL is render, screen, fireEvent.
+render() - renders your react component into a virtual dom that RTL creates for testing.
+- returns helpers like
+container() - the root DOM node
+unmount() - removes the component for cleanup
+rerender() - updates with new props
+
+eg)
+code
+const { container } = render(<Counter />);
+
+b) screen - is a global query object that lets you find elements the way a user would see them
+
+eg)
+code
+screen.getByText("Immanuel");
+screen.getByRole("button");
+screen.getByTestId("counter");
+- its preferred from destructuring from render(), because its global and matches how a user interacts with the full page.
+
+c) fireEvent - simulates user interactions eg clicks, typing, input
+
+eg)
+code
+fireEvent.click(screen.getByText("Increment"));
+expect(screen.getByTest("Count : 1")).toBeInTheDocument();
+- this means when user clicks this button, I expect to see count : 1. this is behavioral testing.
+
+| Tool                    | From | Purpose                         | Example                         |
+| ----------------------- | ---- | ------------------------------- | ------------------------------- |
+| `render()`              | RTL  | Mounts your component           | `render(<App />)`               |
+| `screen`                | RTL  | Queries DOM like a user         | `screen.getByText("Login")`     |
+| `fireEvent`             | RTL  | Simulates user actions          | `fireEvent.click(button)`       |
+| `jest.spyOn()`          | Jest | Watch or mock function behavior | `jest.spyOn(global, "fetch")`   |
+| `.mockImplementation()` | Jest | Override behavior               | `.mockImplementation(() => 42)` |
+| `jest.useFakeTimers()`  | Jest | Control async timers manually   | `jest.runAllTimers()`           |
+| `.toHaveBeenCalled()`   | Jest | Assert function calls           | `expect(fn).toHaveBeenCalled()` |
+
+Qn) What are the 3 main tests in React application
+
+my-answer:
+
+explanation:
+test type - what it focuses on - example
+i) unit test - tests a single component or function in isolation - testing a button renders with correct test.
+ii) integration testing - testing how components work together - testing a loginForm + authContext + API mock
+iii) End-to-end testing (E2E) - tests the entire app through the browser - using cypress/playwright to simulate real users
+
+ToDo
+- cypress
+
+Qn) React Testing Library is strictly for component unit testing. Integration tests aren't allowed.
+a) true
+b) false
+
+my-answer: i guess false. i think somehow integration tests can be done. say when mocking a function being called somewhere else
+
+correct-answer: false
+
+explanation:
+in fact, from the RTL philosoply, the more your tests resemble how your app is used, the more confidence they give you.
+- while you can do small component unit tests, its advisable todo integration tests, testing multiple components working together in the DOM
+
+eg)
+code
+Counter.js
+export default function Counter({ onCountChange }) {
+    const [count, setCount] = React.useState(0);
+
+    return (
+        <>
+            <p>Count: {count}</p>
+            <button onClick={() => {
+                setCount(count + 1);
+                onCountChange(count + 1);
+            }}>Increment</button>
+        </>
+    );
+}
+
+and a parent
+Dashboard.js
+import Counter from './Counter';
+import React from "react";
+
+export default function Dashboard() {
+    const [latestCount, setLatestCount] = useState(0);
+
+    return (
+        <div>
+            <h2>Latest count: {latestCount}</h2>
+            <Counter onCountChange={setLatestCount} />
+        </div>
+    );
+}
+
+integration test
+import { render, screen, fireEvent } from "@testing-library/react";
+import Dashboard from "./Dashboard";
+
+test("updates latest count when counter is clicked", () => {
+    render(<Dashboard />);
+
+    fireEvent.click(screen.getByText("Increment"));
+
+    expect(screen.getByText("Latest count: 1")).toBeInTheDocument();
+});
+
+- so you want to test components together to ensure real user behaviour works as expected, like event handling, or context updates, without focusing on implementation details  
+
+Qn) Generally, querySelector, querySelectorAll, getElementByID, and similar browser DOM methods, wount be used much in RTL
+a) true 
+b) false
+
+my-answer: true. even though i need to be reminded these DOM methods are for JS, or pest or RTL but obviously not for the latter. i feel like RTL has its own markers. i dont know.
+
+correct-answer: true
+
+explanation: 
+1) examples of vanilla JS DOM methods
+i) document.getElementById() - finds one element by ID
+ii) document.querySelector() - finds the first matching element by CSS selector
+iii) document.querySelectorAll() - finds all matching elements by a selector
+iv) document.getElementByClassName() - returns live collections by class.
+
+eg)
+code
+const title = document.getElementById("main-title");
+const buttons = document.getElementById("button");
+- these are imperative. you manually search and manipulate the DOM. 
+
+2) React Testing Library - 
+- provides its own declarative, user-centric query APIs - that are designed to simulate how a real user interacts with the app.
+RTM method - what it does
+getByText() - synchronous way to find elements by visible text
+getByRole() - finds by ARIA role (eg button "textbox")
+getByLabelText() - finds inputs associated with a label
+getByTestId() - finds elements by data-testId attribute
+queryByText() findByText() - same as getByText but for asynchronous or non-existing elements yet.
+
+eg)
+code
+import { render, screen } from "@testing-library/react";
+import App from "./App";
+
+test("renders login button", () => {
+    render(<App />);
+    expect(screen.getByRole('button', { name : /login/i })).toBeInTheDocument();
+});
+
+no need for
+document.getElementById("button");
+
+- so we dont use querySelectors in RTL because 
+a) RTL abstracts away DOM mechanics - you test behaviour, not implementation
+b) RTL encourages accessibility best practices - using roles and labels
+c) RTL render() wraps your component inside a virtual DOM - using raw DOM methods breaks this isolation
+d) Cleaner and more readable - screen.getByRole('button') sounds like plain English
+
+Qn) If you want to run queries inside a component's children, which RTL render return method is the best choice
+a) children
+b) container
+c) inside
+d) within
+
+my-answer: b container. because i dont think the rest are render return methods. i think its only container() , unmount() and cleanup(). but i dont know if a container can access component's children. its used like this const { container } = render(<App />); then maybe app has a Counter. maybe you can use container to get something in Counter.
+
+correct-answer: d within
+
+explanation: within(), lets you scope your queries to a specific DOM node, instead of searching the entire document. 
+- by default, screen.getByText() searches the entire rendered app. but with within(), you can focus on one element (like a child component or section.)
+
+eg)
+code
+App.js
+export default function App() {
+    return (
+        <div>
+            <section aria-label="user info">
+                <p>Username: Immanuel</p>
+            </section>
+            <section aria-label="settings">
+                <p>Dark mode</p>
+            </section>
+        </div>
+    )
+}
+
+normal query
+render<App />
+screen.getByText("Dark mode"); // works, searches globally
+
+scoped query
+const { getByLabelText } = screen;
+const userInfoSection = getByLabelText("user info");
+
+expect(within(userInfoSection)).getByText("Username: Immanuel").toBeInTheDocument();
+
+why not container
+const { container } = render(<App />);
+container.querySelector("p");
+- this is not adviced because container uses RAW DOM methods, not RTL. you loose the accessibility benefits, you cant use RTL matchers like getByRole, you are testing DOM structure instead of user experience. RTL discourages using containers unless you have no other option like testing SVGs or non-accessible elements.
+- other render return methods
+const { container, unmount, rerender, asFragment, debug, within } = render(<App />);
+asFragment btw returns a snapshot-friendly representation.
+within - scopes queries to a specific DOM node.
+
+Qn) Consider the following component
+render(<input type="text" name="userName" />);
+Will the following selection succeed?
+screen.getByRole("textbox", {name: "userName"});
+a) yes
+b) no
+
+my-answer: yes. but i know that getByRole gets by aria accessibility. will this work without the aria in the input tag or it just checks the html attribute button?
+
+correct-answer: no
+
+explanation: the name of attribute is not used by screenreaders to accessibility APIs. so it wount find element by { name: "userName" } unless there is a visible label, aria-label
+- this will work
+
+eg)
+code
+render(<input name="button" aria-label="userName" />);
+screen.getByRole("textbox", { name : "userName" });
+or
+render(<label> userName <input type="text" /> </label>);
+screen.getByRole("textbox", { name: "userName" });
+
+review | Note | my-learning
+- you see inputs should be in a label
+- else, continue following
+
+- RTL queries elements based on what is exposed to assistive technologies not just DOM values. to make the query pass use aria-label or <label>
+
+Qn) Which of the following do not contribute to an element's accessibility name?
+a) aria-label
+b) <label> text
+c) title attribute
+d) name attribute
+
+my-answer: d
+
+correct-answer: d
+
+explanation: the accessibility name is derived from things like a <label> or aria-label, sometimes title but not name attribute.
+
+Qn) Which of the following React Testing Library queries is most closely alligned with accessibility best practices?
+a) getByTestId
+b) getByLabelText
+c) getByRole
+d) querySelector
+
+my-answer: c
+
+correct-answer: c
+
+explanation: getByRole is king. it is the most accessible and user-centric query. it reflects what the screen reader would perceive. 
+
+Qn) suppose you have this code:
+<label htmlFor="email">Email Address</label>
+<input type="email" id="email" />
+which of the following accessibility names would getByRole("textbox") use
+a) The value of the id "email"
+b) The value of the name attribute
+c) The text inside <label> ("Email Address")
+d) None - it would fail
+
+my-answer: c
+
+correct-answer: c
+
+explanation:  the label text becomes the element's accessibility name through the htmlFor -> id link
+
+
+
+
+
+
