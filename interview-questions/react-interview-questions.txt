@@ -2034,7 +2034,7 @@ c) getByRole
 d) querySelector
 
 my-answer: c
-
+hi
 correct-answer: c
 
 explanation: getByRole is king. it is the most accessible and user-centric query. it reflects what the screen reader would perceive. 
