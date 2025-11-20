@@ -2054,6 +2054,100 @@ correct-answer: c
 
 explanation:  the label text becomes the element's accessibility name through the htmlFor -> id link
 
+20.11.25
+Qn) Consider the following component:
+render(<h1>hello world</h1>);
+Will the following selection succeed?
+screen.getByText("hello");
+a) yes
+b) no
+
+my-answer: i think it kinda matches entire string, so i think no. i dont know though
+
+correct-answer: yes
+
+explanation: screen.getByText() does partial matching by default. hello is a substring of hello world.
+- if you required an exact match, you would need to specify;
+screen.getByText("hello", { exact: true});
+or use a regex
+scree.getByText(/^hello world$/);
+
+Qn) Consider the following component:
+render(<h1>    hello    world    </h1>);
+Will the following selection succeed?
+screen.getByText("hello world");
+a) yes
+b) no
+
+my-answer: i think yes. maybe because it will strip the white space? or its not considered part of the hello
+
+correct-answer: yes
+
+explanation: react testing library normalizes whitespaces by default when matching text. this means; render(<h1>    hello    world    </h1>); will be normalized internally to hello world
+
+Qn) Does the following test use React Testing Library?
+describe('Output element', () => {
+    it('should render an element with class name "output"', () => {
+        const calc = mount(<Calculator />);
+        expect(calc.find('.output').exists()).toBe(true);
+    });
+});
+a) yes
+b) no
+
+my-answer: at the beginning, ive never seen matchers like describe and the keyword it but i could say yes because of expect(calc.find( ....
+
+correct-answer: b
+
+explanation: React Testing Library never uses mount(), .find(), calc.find(). these belong to Enzyme; an onlder React Testing Library. 
+- React Testing Library uses render() , scree.getBy() , getByRole , getByText
+eg)
+render(<Calculator />);
+expect(screen.getByRole("button", {name: "+" })).toBeInTheDocument();
+
+Qn) is testInstance.findAllByProps(props) part of the React Testing Library API?
+a) yes
+b) no
+
+my-answer: no. ive never heard of this.
+
+correct-answer: b
+
+explanation: the testInstance.findAllByProps(props) is not part of React Testing Library, this method however belongs to React Test Renderer, not RTL. 
+- React Test Renderer (react-test-renderer) is used for testing React component trees without the DOM and is not common today. RTL never lets you select elements by props. RTL intentionally avoids anything related to implementation details. 
+eg of react test renderer
+import TestRenderer from "react-test-renderer";
+
+const testRenderer = TestRenderer.create(<MyComponent />);
+const testInstance = testRenderer.root;
+
+const items = testInstance.findAllByProps({ disabled: true });
+- RTL selects elements the way a user would
+getByRole, getByLabelText, getByText, getByPlaceholderText, getByAltText, getByDisplayValue, getByTitle, getByTestId.
+Qn) queryAllBy returns an empty array when no elements are located
+a) true
+b) false
+
+my-answer: what i can remember is that queryBy is asynchronous and waits for something. and maybe queryAllBy fails silently by returning an empty array when selected elements are not found.
+
+correct-answer: a
+
+explanation: 
+in the RTL method groups which are
+getBy - throwns an error when not found  - returns element - synchronous
+getAllBy  - no error but throws if 0 elements - returns array  - synchronous
+queryBy  - no  - returns element or null - synchronous
+queryAllBy  - no - returns array and empty if none  - synchronous
+findBy  - no but rejects after timeout - returns promise element  - asynchronous
+findAllBy  - no and rejects after timeout - returns promise array  - asynchronous
+- queryAllBy returns an empty array when not found. it is perfect for asserting something does not exist multiple times
+eg)
+const buttons = screen.queryAllByRole("button");
+expect(buttons).toHaveLength(0);
+
+Qn) To issue trusted events, you can use the user-event extension.
+a) true
+b) false
 
 
 
